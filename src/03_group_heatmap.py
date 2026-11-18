@@ -39,6 +39,8 @@ n_votes = {
 
 # Ordre gauche -> droite ; les codes non listés sont ajoutés à la fin
 political_order = ["GUE_NGL", "GREEN_EFA", "SD", "RENEW", "EPP", "ECR", "ID", "NI"]
+# English labels for political groups
+group_labels = { "GUE_NGL": "The Left", "GREEN_EFA": "Greens/EFA", "SD": "S&D", "RENEW": "Renew Europe", "EPP": "EPP", "ECR": "ECR", "ID": "Identity & Democracy", "NI": "Non-attached" }
 present = set(member_to_group.unique())
 groups = [g for g in political_order if g in present]
 groups += sorted(present - set(groups))
@@ -86,39 +88,104 @@ global_min = min(np.nanmin(gm.to_numpy()) for gm, _ in results.values())
 VMIN = float(np.floor(global_min / 5) * 5)
 VMAX = 100.0
 
+
 # =============================================================================
 # 3. HEATMAPS
 # =============================================================================
-sns.set_theme(style="white", font_scale=1.1)
+sns.set_theme(style="white", font_scale=1.0)
 os.makedirs("outputs", exist_ok=True)
 
 titles = {
-    "all": "Tous les scrutins (amendements compris)",
-    "main": "Votes principaux uniquement",
+    "all": "All roll-call votes (including amendments)",
+    "main": "Main votes only",
 }
 
 
 def plot_heatmap(name, gm, n_eff):
-    labels = [f"{g}\n(n={n_eff[g]})" for g in gm.index]
-    plt.figure(figsize=(10, 8), dpi=300)
-    ax = sns.heatmap(
-        gm, annot=True, fmt=".1f", cmap="YlGnBu", vmin=VMIN, vmax=VMAX,
-        cbar_kws={"label": "Taux d'accord moyen (%)"},
-        linewidths=1.5, linecolor="white", square=True,
-        xticklabels=labels, yticklabels=labels,
+
+    # Replace technical group codes with readable English labels
+    labels = [
+        f"{group_labels.get(g, g)}\n(n={n_eff[g]})"
+        for g in gm.index
+    ]
+
+    # Larger figure to prevent label overlap
+    fig, ax = plt.subplots(figsize=(13, 10), dpi=300)
+
+    sns.heatmap(
+        gm,
+        annot=True,
+        fmt=".1f",
+        cmap="YlGnBu",
+        vmin=VMIN,
+        vmax=VMAX,
+        cbar_kws={"label": "Average agreement (%)"},
+        linewidths=1.5,
+        linecolor="white",
+        square=True,
+        xticklabels=labels,
+        yticklabels=labels,
+        ax=ax,
+        annot_kws={"size": 9}
     )
+
     ax.set_title(
-        "Alignement des groupes politiques - DSA, DMA, AI Act, Data Act, CRA "
-        f"(9e législature)\n{titles[name]} : {n_votes[name]} scrutins",
-        fontsize=12, fontweight="bold", pad=20,
+        "Voting alignment between political groups – "
+        "DSA, DMA, AI Act, Data Act and CRA "
+        "(9th parliamentary term)\n"
+        f"{titles[name]}: {n_votes[name]} votes",
+        fontsize=13,
+        fontweight="bold",
+        pad=22
     )
-    plt.xticks(rotation=30, ha="right", fontweight="bold")
-    plt.yticks(rotation=0, fontweight="bold")
-    plt.tight_layout()
-    plt.savefig(f"outputs/coalitions_heatmap_{name}.png", dpi=300)
+
+    # Improve axis label readability
+    ax.set_xticklabels(
+        labels,
+        rotation=45,
+        ha="right",
+        fontsize=8,
+        fontweight="bold"
+    )
+
+    ax.set_yticklabels(
+        labels,
+        rotation=0,
+        fontsize=9,
+        fontweight="bold"
+    )
+
+    ax.set_xlabel("Political groups", fontsize=10, labelpad=12)
+    ax.set_ylabel("Political groups", fontsize=10, labelpad=12)
+
+    # Explain the number of members displayed in the labels
+    fig.text(
+        0.5, 0.015,
+        "n = members with at least one valid pairwise comparison",
+        ha="center",
+        fontsize=8,
+        color="dimgray"
+    )
+
+    plt.tight_layout(rect=[0, 0.04, 1, 1])
+
+    plt.savefig(
+        f"outputs/coalitions_heatmap_{name}.png",
+        dpi=300,
+        bbox_inches="tight"
+    )
+
     plt.close()
-    gm.round(2).to_csv(f"outputs/group_agreement_{name}.csv")
-    print(f"-> outputs/coalitions_heatmap_{name}.png et group_agreement_{name}.csv")
+
+    # Keep CSV group codes unchanged for reproducibility
+    gm.round(2).to_csv(
+        f"outputs/group_agreement_{name}.csv"
+    )
+
+    print(
+        f"-> outputs/coalitions_heatmap_{name}.png "
+        f"and group_agreement_{name}.csv"
+    )
 
 
 for name, (gm, n_eff) in results.items():
